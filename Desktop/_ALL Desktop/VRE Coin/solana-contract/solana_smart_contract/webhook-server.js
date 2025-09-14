@@ -160,19 +160,21 @@ app.post('/webhook/payment', async (req, res) => {
             return res.status(200).json({ success: true, message: 'Test webhook received' });
         }
         
-        // Verify webhook signature (security) - only for real Helius webhooks
-        const signature = req.headers['x-helius-signature'];
-        if (signature && WEBHOOK_SECRET !== 'your-secret-key-here') {
+        // Verify webhook authentication - Helius sends Bearer token
+        const authHeader = req.headers['authorization'];
+        if (authHeader && WEBHOOK_SECRET !== 'your-secret-key-here') {
             try {
-                const body = JSON.stringify(req.body);
-                if (!verifyWebhookSignature(body, signature, WEBHOOK_SECRET)) {
-                    console.error('❌ Invalid webhook signature');
-                    return res.status(401).json({ error: 'Invalid signature' });
+                const expectedAuth = `Bearer ${WEBHOOK_SECRET}`;
+                if (authHeader !== expectedAuth) {
+                    console.error('❌ Invalid webhook authentication');
+                    console.error('Expected:', expectedAuth);
+                    console.error('Received:', authHeader);
+                    return res.status(401).json({ error: 'Invalid authentication' });
                 }
-                console.log('✅ Webhook signature verified');
-            } catch (sigError) {
-                console.error('❌ Signature verification error:', sigError.message);
-                // Continue processing - signature verification is optional for debugging
+                console.log('✅ Webhook authentication verified');
+            } catch (authError) {
+                console.error('❌ Authentication verification error:', authError.message);
+                // Continue processing - auth verification is optional for debugging
             }
         }
         
