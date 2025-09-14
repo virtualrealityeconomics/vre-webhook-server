@@ -5,6 +5,29 @@ const { Connection, PublicKey } = require('@solana/web3.js');
 const VRE_MINT = '2gV6LWHFji9XFUBdXKYWspE8KKQJwgNGn9jvfT5tWG5Y';
 const connection = new Connection('https://api.devnet.solana.com');
 
+// Helper function to get the correct spl-token command path
+function getSplTokenCommand() {
+    // Try multiple possible paths for Railway deployment
+    const possiblePaths = [
+        'spl-token', // Default PATH
+        '/usr/local/bin/spl-token', // Symlink location
+        '/root/.local/share/solana/install/active_release/bin/spl-token' // Original install location
+    ];
+    
+    for (const path of possiblePaths) {
+        try {
+            execSync(`${path} --version`, { encoding: 'utf8', stdio: 'ignore' });
+            console.log(`✅ Found spl-token at: ${path}`);
+            return path;
+        } catch (error) {
+            continue;
+        }
+    }
+    
+    console.error('❌ spl-token command not found in any location');
+    return 'spl-token'; // Fallback to default
+}
+
 console.log('⚡ ULTIMATE VRE Token Distributor with Liberation Day Lock');
 console.log('🪙 VRE Token Mint:', VRE_MINT);
 console.log('🔐 Liberation Day: July 18, 2028');
@@ -14,7 +37,8 @@ console.log('');
 // Function to check if account is frozen using spl-token CLI
 function checkAccountFrozenStatus(walletAddress) {
     try {
-        const command = `spl-token account-info ${VRE_MINT} ${walletAddress}`;
+        const splTokenCmd = getSplTokenCommand();
+        const command = `${splTokenCmd} account-info ${VRE_MINT} ${walletAddress}`;
         const output = execSync(command, { encoding: 'utf8' });
         
         // Parse the output to find State
@@ -65,7 +89,7 @@ async function ultimateDeliverVRE(buyerWalletAddress, amountVRE) {
             console.log('🆕 New account detected');
             
             console.log('💸 TRANSFER: Sending VRE tokens to new account...');
-            const transferCommand = `spl-token transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress} --allow-unfunded-recipient --fund-recipient`;
+            const transferCommand = `${getSplTokenCommand()} transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress} --allow-unfunded-recipient --fund-recipient`;
             const transferOutput = execSync(transferCommand, { encoding: 'utf8' });
             
             // Extract signature from output
@@ -80,12 +104,12 @@ async function ultimateDeliverVRE(buyerWalletAddress, amountVRE) {
             console.log('🔒 Frozen account detected - implementing smart sequence');
             
             console.log('🔓 UNFREEZE: Temporarily unfreezing account...');
-            const unfreezeCommand = `spl-token thaw ${accountStatus.tokenAccount}`;
+            const unfreezeCommand = `${getSplTokenCommand()} thaw ${accountStatus.tokenAccount}`;
             execSync(unfreezeCommand);
             console.log('✅ UNFREEZE COMPLETE');
             
             console.log('💸 TRANSFER: Sending VRE tokens...');
-            const transferCommand = `spl-token transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress}`;
+            const transferCommand = `${getSplTokenCommand()} transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress}`;
             const transferOutput = execSync(transferCommand, { encoding: 'utf8' });
             
             const signatureMatch = transferOutput.match(/Signature: ([A-Za-z0-9]+)/);
@@ -99,7 +123,7 @@ async function ultimateDeliverVRE(buyerWalletAddress, amountVRE) {
             console.log('🔓 Unfrozen account detected');
             
             console.log('💸 TRANSFER: Sending VRE tokens...');
-            const transferCommand = `spl-token transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress}`;
+            const transferCommand = `${getSplTokenCommand()} transfer ${VRE_MINT} ${amountVRE} ${buyerWalletAddress}`;
             const transferOutput = execSync(transferCommand, { encoding: 'utf8' });
             
             const signatureMatch = transferOutput.match(/Signature: ([A-Za-z0-9]+)/);
@@ -111,7 +135,7 @@ async function ultimateDeliverVRE(buyerWalletAddress, amountVRE) {
         // Step 3: Always freeze at the end (Liberation Day Lock)
         console.log('🔒 FREEZE: Locking account until Liberation Day...');
         const finalStatus = checkAccountFrozenStatus(buyerWalletAddress);
-        const freezeCommand = `spl-token freeze ${finalStatus.tokenAccount}`;
+        const freezeCommand = `${getSplTokenCommand()} freeze ${finalStatus.tokenAccount}`;
         const freezeOutput = execSync(freezeCommand, { encoding: 'utf8' });
         
         const freezeSignatureMatch = freezeOutput.match(/Signature: ([A-Za-z0-9]+)/);
