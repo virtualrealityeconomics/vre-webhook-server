@@ -1,6 +1,7 @@
 const express = require('express');
 const crypto = require('crypto');
 const { ultimateDeliverVRE } = require('./ultimate-token-distributor.js');
+const { jsDeliverVRE } = require('./js-token-distributor.js');
 const { updatePurchaseWithVRESignature } = require('./firebase-updater.js');
 
 // Configuration
@@ -151,9 +152,22 @@ async function processWebhookPayment(transactionData) {
             const vreAmount = calculateVREFromSOL(solReceived, solPrice);
             console.log(`🎯 VRE Tokens to deliver: ${vreAmount}`);
             
-            // Deliver tokens using Ultimate Token Distributor
+            // Deliver tokens - try CLI first, fallback to JavaScript approach
             console.log(`🚀 INITIATING AUTO-DELIVERY...`);
-            const deliveryResult = await ultimateDeliverVRE(senderAddress, vreAmount);
+            let deliveryResult = await ultimateDeliverVRE(senderAddress, vreAmount);
+
+            // If CLI approach failed, try JavaScript approach
+            if (!deliveryResult.success && deliveryResult.error && deliveryResult.error.includes('spl-token')) {
+                console.log(`🔄 CLI approach failed, trying JavaScript approach...`);
+                deliveryResult = await jsDeliverVRE(senderAddress, vreAmount);
+
+                if (deliveryResult.success) {
+                    console.log(`✅ JavaScript delivery successful!`);
+                    // Format result to match expected structure
+                    deliveryResult.process = 'JavaScript SDK (no CLI)';
+                    deliveryResult.newBalance = deliveryResult.amount; // Approximate
+                }
+            }
             
             if (deliveryResult.success) {
                 console.log(`✅ WEBHOOK DELIVERY SUCCESSFUL!`);
