@@ -309,12 +309,43 @@ app.get('/health', (req, res) => {
     });
 });
 
+// Verify Solana CLI on startup
+const { execSync } = require('child_process');
+
+function verifySolanaCLI() {
+    const possiblePaths = [
+        'spl-token',
+        '/usr/local/bin/spl-token',
+        '/root/.local/share/solana/install/active_release/bin/spl-token'
+    ];
+
+    console.log('🔍 Verifying Solana CLI installation...');
+
+    for (const path of possiblePaths) {
+        try {
+            const version = execSync(`${path} --version`, { encoding: 'utf8', stdio: 'pipe' });
+            console.log(`✅ Found spl-token at: ${path}`);
+            console.log(`📦 Version: ${version.trim()}`);
+            return path;
+        } catch (error) {
+            console.log(`❌ spl-token not found at: ${path}`);
+        }
+    }
+
+    console.error('🚨 CRITICAL: spl-token command not found anywhere!');
+    console.error('🔧 This will prevent VRE token delivery!');
+    return null;
+}
+
 // Start server (Railway deployment)
 app.listen(PORT, () => {
     console.log(`\\n✅ VRE Webhook Server running on port ${PORT}`);
     console.log(`📡 Webhook endpoint: http://localhost:${PORT}/webhook/payment`);
     console.log(`🏥 Health check: http://localhost:${PORT}/health`);
     console.log(`🔒 Webhook secret: ${WEBHOOK_SECRET !== 'your-secret-key-here' ? 'Configured' : 'NOT SET (dev mode)'}`);
+
+    // Verify Solana CLI is working
+    verifySolanaCLI();
 });
 
 module.exports = app;
