@@ -23,15 +23,25 @@ console.log('🔗 Webhook Port:', PORT);
 
 // Webhook signature verification (security)
 function verifyWebhookSignature(body, signature, secret) {
-    const computedSignature = crypto
-        .createHmac('sha256', secret)
-        .update(body)
-        .digest('hex');
-    
-    return crypto.timingSafeEqual(
-        Buffer.from(signature, 'hex'),
-        Buffer.from(computedSignature, 'hex')
-    );
+    try {
+        const computedSignature = crypto
+            .createHmac('sha256', secret)
+            .update(body)
+            .digest('hex');
+        
+        // Ensure both signatures have the same length before comparing
+        if (signature.length !== computedSignature.length) {
+            return false;
+        }
+        
+        return crypto.timingSafeEqual(
+            Buffer.from(signature, 'hex'),
+            Buffer.from(computedSignature, 'hex')
+        );
+    } catch (error) {
+        console.error('❌ Signature verification error:', error.message);
+        return false;
+    }
 }
 
 // Function to get SOL price with fallback
