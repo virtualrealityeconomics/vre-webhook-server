@@ -150,43 +150,95 @@ async function processWebhookPayment(transactionData) {
 app.post('/webhook/payment', async (req, res) => {
     try {
         console.log('📨 Webhook received:', new Date().toISOString());
+        console.log('📋 Headers:', req.headers);
+        console.log('📦 Body type:', typeof req.body);
+        console.log('📦 Body preview:', JSON.stringify(req.body).substring(0, 200));
         
-        // Verify webhook signature (security)
+        // Handle test requests
+        if (req.body && req.body.test) {
+            console.log('🧪 Test webhook received');
+            return res.status(200).json({ success: true, message: 'Test webhook received' });
+        }
+        
+        // Verify webhook signature (security) - only for real Helius webhooks
         const signature = req.headers['x-helius-signature'];
         if (signature && WEBHOOK_SECRET !== 'your-secret-key-here') {
-            const body = JSON.stringify(req.body);
-            if (!verifyWebhookSignature(body, signature, WEBHOOK_SECRET)) {
-                console.error('❌ Invalid webhook signature');
-                return res.status(401).json({ error: 'Invalid signature' });
+            try {
+                const body = JSON.stringify(req.body);
+                if (!verifyWebhookSignature(body, signature, WEBHOOK_SECRET)) {
+                    console.error('❌ Invalid webhook signature');
+                    return res.status(401).json({ error: 'Invalid signature' });
+                }
+                console.log('✅ Webhook signature verified');
+            } catch (sigError) {
+                console.error('❌ Signature verification error:', sigError.message);
+                // Continue processing - signature verification is optional for debugging
             }
         }
         
+        // Ensure we have transaction data
+        if (!req.body) {
+            console.error('❌ No webhook body received');
+            return res.status(400).json({ error: 'No transaction data' });
+        }
+        
         // Process each transaction in the webhook
-        const transactions = req.body;
+        let transactions = req.body;
         const results = [];
+        
+        // Handle Helius webhook format
+        if (transactions && typeof transactions === 'object' && !Array.isArray(transactions)) {
+            // Check if it's a single transaction or has transactions array
+            if (transactions.transaction) {
+                transactions = [transactions.transaction];
+            } else if (transactions.transactions) {
+                transactions = transactions.transactions;
+            } else {
+                transactions = [transactions];
+            }
+        }
         
         if (Array.isArray(transactions)) {
             // Multiple transactions
             for (const tx of transactions) {
-                const result = await processWebhookPayment(tx);
-                results.push(result);
+                try {
+                    const result = await processWebhookPayment(tx);
+                    results.push(result);
+                } catch (txError) {
+                    console.error('❌ Transaction processing error:', txError.message);
+                    results.push({ success: false, error: txError.message });
+                }
             }
         } else {
             // Single transaction
-            const result = await processWebhookPayment(transactions);
-            results.push(result);
+            try {
+                const result = await processWebhookPayment(transactions);
+                results.push(result);
+            } catch (txError) {
+                console.error('❌ Transaction processing error:', txError.message);
+                results.push({ success: false, error: txError.message });
+            }
         }
         
         // Respond to webhook
+        const successfulResults = results.filter(r => r.success && !r.duplicate && !r.notPayment);
+        
+        console.log(`✅ Webhook processed: ${results.length} transactions, ${successfulResults.length} successful deliveries`);
+        
         res.status(200).json({
             success: true,
             processed: results.length,
-            results: results.filter(r => r.success && !r.duplicate && !r.notPayment)
+            delivered: successfulResults.length,
+            results: successfulResults
         });
         
     } catch (error) {
         console.error('❌ Webhook error:', error.message);
-        res.status(500).json({ error: 'Internal server error' });
+        console.error('❌ Stack trace:', error.stack);
+        res.status(500).json({ 
+            error: 'Internal server error',
+            message: error.message 
+        });
     }
 });
 
