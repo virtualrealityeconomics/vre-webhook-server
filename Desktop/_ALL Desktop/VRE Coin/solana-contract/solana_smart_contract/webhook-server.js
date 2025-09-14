@@ -100,23 +100,40 @@ async function processWebhookPayment(transactionData) {
         // Method 2: Check accountData for balance changes (Helius enhanced format)
         if (solReceived === 0 && transactionData.accountData) {
             console.log('🔍 Checking accountData for balance changes...');
+            console.log('🎯 Looking for treasury wallet:', TREASURY_WALLET);
+
+            let treasuryFound = false;
             for (const account of transactionData.accountData) {
                 console.log('📊 Account:', account.account, 'Balance Change:', account.nativeBalanceChange);
-                
-                // Treasury wallet received SOL (positive balance change)
-                if (account.account === TREASURY_WALLET && account.nativeBalanceChange > 0) {
-                    solReceived = account.nativeBalanceChange / 1e9;
-                    console.log('✅ Found treasury wallet balance increase:', solReceived, 'SOL');
-                    
-                    // Find the sender (account with negative balance change)
-                    for (const senderAccount of transactionData.accountData) {
-                        if (senderAccount.nativeBalanceChange < 0 && senderAccount.account !== TREASURY_WALLET) {
-                            senderAddress = senderAccount.account;
-                            console.log('✅ Found sender:', senderAddress);
-                            break;
-                        }
+
+                // Check if this is the treasury wallet
+                if (account.account === TREASURY_WALLET) {
+                    treasuryFound = true;
+                    console.log('🏦 Treasury wallet found in transaction!');
+
+                    // Treasury wallet received SOL (positive balance change)
+                    if (account.nativeBalanceChange > 0) {
+                        solReceived = account.nativeBalanceChange / 1e9;
+                        console.log('✅ Found treasury wallet balance increase:', solReceived, 'SOL');
+                    } else {
+                        console.log('⚠️ Treasury wallet balance change is not positive:', account.nativeBalanceChange);
                     }
-                    break;
+                }
+            }
+
+            if (!treasuryFound) {
+                console.log('❌ Treasury wallet not found in transaction accountData');
+                console.log('📋 Accounts in transaction:', transactionData.accountData.map(a => a.account));
+            }
+
+            // Find the sender (account with negative balance change) after we know treasury received SOL
+            if (solReceived > 0) {
+                for (const senderAccount of transactionData.accountData) {
+                    if (senderAccount.nativeBalanceChange < 0 && senderAccount.account !== TREASURY_WALLET) {
+                        senderAddress = senderAccount.account;
+                        console.log('✅ Found sender:', senderAddress);
+                        break;
+                    }
                 }
             }
         }
