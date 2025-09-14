@@ -67,12 +67,15 @@ async function jsDeliverVRE(buyerWalletAddress, amountVRE) {
 
         console.log('🏦 Buyer token account:', buyerTokenAccount.toString());
 
-        // Check if buyer's token account exists
+        // Check if buyer's token account exists and if it's frozen
         let accountExists = false;
+        let accountFrozen = false;
         try {
-            await getAccount(connection, buyerTokenAccount);
+            const accountInfo = await getAccount(connection, buyerTokenAccount);
             accountExists = true;
+            accountFrozen = accountInfo.isFrozen;
             console.log('✅ Buyer token account exists');
+            console.log(`🔒 Account frozen status: ${accountFrozen}`);
         } catch (error) {
             console.log('🆕 Buyer token account does not exist, will create');
         }
@@ -90,6 +93,17 @@ async function jsDeliverVRE(buyerWalletAddress, amountVRE) {
             );
             transaction.add(createAccountIx);
             console.log('📝 Added create token account instruction');
+        }
+
+        // If account is frozen, unfreeze it first (Liberation Day Lock logic)
+        if (accountExists && accountFrozen) {
+            const thawIx = createThawAccountInstruction(
+                buyerTokenAccount,   // account to unfreeze
+                mintPubkey,         // mint
+                authority.publicKey // freeze authority
+            );
+            transaction.add(thawIx);
+            console.log('🔓 Added thaw instruction (account was frozen)');
         }
 
         // Convert VRE amount to token units (assuming 6 decimals)
