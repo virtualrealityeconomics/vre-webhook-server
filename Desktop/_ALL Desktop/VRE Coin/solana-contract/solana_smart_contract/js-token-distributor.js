@@ -106,8 +106,8 @@ async function jsDeliverVRE(buyerWalletAddress, amountVRE) {
             console.log('🔓 Added thaw instruction (account was frozen)');
         }
 
-        // Convert VRE amount to token units (assuming 6 decimals)
-        const tokenAmount = Math.floor(amountVRE * 1000000);
+        // Convert VRE amount to token units (VRE has 9 decimals)
+        const tokenAmount = Math.floor(amountVRE * 1000000000);
 
         // Get authority's token account (treasury)
         const authorityTokenAccount = await getAssociatedTokenAddress(
