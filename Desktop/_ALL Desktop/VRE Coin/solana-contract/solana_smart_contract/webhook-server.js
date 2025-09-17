@@ -8,7 +8,7 @@ const { updatePurchaseWithVRESignature } = require('./firebase-updater.js');
 const app = express();
 const PORT = process.env.PORT || 3002;
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'your-secret-key-here';
-const TREASURY_WALLET = '77tdiYmGhXX5Kt1dRFCGN1wNKfTJm8SBAdY8GLBGLjvU';
+const TREASURY_WALLET = 'ASvW5fhNX7abbWKsyKt4XRzC2QDnmh8VykeyiWgj7HgU';
 const VRE_PRICE_USD = 0.20;
 
 // Middleware

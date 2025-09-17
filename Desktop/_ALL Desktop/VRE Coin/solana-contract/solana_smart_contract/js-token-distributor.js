@@ -19,8 +19,8 @@ const {
 const bs58 = require('bs58');
 
 // Configuration
-const VRE_MINT = '2gV6LWHFji9XFUBdXKYWspE8KKQJwgNGn9jvfT5tWG5Y';
-const connection = new Connection('https://api.devnet.solana.com');
+const VRE_MINT = 'FJHQH4WTDukwyeFov2H7U9GZSiy4PPYLeuMGpbCujZd9';
+const connection = new Connection('https://api.mainnet-beta.solana.com');
 
 // Load authority keypair from environment
 function getAuthorityKeypair() {
