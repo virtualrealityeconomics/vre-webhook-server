@@ -5,4 +5,4 @@ nixPkgs = ["nodejs_18"]
 cmds = ["cd 'solana-contract/solana_smart_contract' && npm install"]
 
 [start]
-cmd = "cd 'solana-contract/solana_smart_contract' && npm start"
+cmd = "cd 'solana-contract/solana_smart_contract' && node moonpay-webhook-handler.js"
