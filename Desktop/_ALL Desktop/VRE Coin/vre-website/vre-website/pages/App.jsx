@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import Head from 'next/head';
 import { initializeApp } from 'firebase/app';
 // Firebase auth imports removed - now using wallet-based authentication
 import { getFirestore, doc, setDoc, collection, query, onSnapshot } from 'firebase/firestore';
@@ -82,7 +83,7 @@ const App = () => {
             // Use wallet public key as user ID (deterministic across devices)
             const walletUserId = publicKey.toString();
             setUserId(walletUserId);
-            setFirebaseStatus(`Wallet Connected: ${truncateId(walletUserId)}`);
+            setFirebaseStatus(`Database Connected: ${truncateId(walletUserId)}`);
             console.log("🔐 Wallet-based user ID:", walletUserId);
             console.log("👛 Wallet address:", publicKey.toString());
 
@@ -158,6 +159,62 @@ const App = () => {
         } else {
             return 'Click "Select Wallet" to connect your wallet.';
         }
+    };
+
+    // --- MoonPay Integration ---
+    const handleMoonPayPayment = async () => {
+        if (!connected || !publicKey) {
+            alert('Please connect your wallet first');
+            return;
+        }
+
+        if (!purchaseAmount || purchaseAmount <= 0) {
+            alert('Please enter a valid amount first');
+            return;
+        }
+
+        // MoonPay widget URL configuration - SOL goes to treasury, VRE delivered automatically
+        const treasuryWallet = 'ASvW5fhNX7abbWKsyKt4XRzC2QDnmh8VykeyiWgj7HgU'; // Your treasury wallet
+        const moonPayUrl = new URL('https://buy-sandbox.moonpay.com');
+        moonPayUrl.searchParams.set('apiKey', 'pk_test_lm3GB5jn6lWY4Zjqd8QKrEWithtLXLNG');
+        moonPayUrl.searchParams.set('currencyCode', 'SOL');
+        moonPayUrl.searchParams.set('walletAddress', treasuryWallet); // SOL goes to your treasury
+        moonPayUrl.searchParams.set('colorCode', '#9945FF');
+        moonPayUrl.searchParams.set('redirectURL', window.location.href);
+        moonPayUrl.searchParams.set('baseCurrencyAmount', (purchaseAmount * 0.20).toString());
+        moonPayUrl.searchParams.set('externalCustomerId', publicKey.toString()); // Track user for VRE delivery
+
+        setStatusMessage('Opening MoonPay payment window...');
+
+        // Record the pending MoonPay purchase
+        if (db && userId) {
+            const pendingId = `moonpay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const docPath = `artifacts/${appId}/users/${userId}/moonpay_pending/${pendingId}`;
+            await setDoc(doc(db, docPath), {
+                tokens_requested: purchaseAmount,
+                usd_amount: purchaseAmount * 0.20,
+                user_wallet: publicKey.toString(),
+                treasury_wallet: treasuryWallet,
+                status: 'pending',
+                created_at: new Date().toISOString(),
+                moonpay_external_id: publicKey.toString()
+            });
+        }
+
+        // Open MoonPay in a new window
+        const moonPayWindow = window.open(
+            moonPayUrl.toString(),
+            'moonpay',
+            'width=420,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        // Listen for completion
+        const checkClosed = setInterval(() => {
+            if (moonPayWindow.closed) {
+                clearInterval(checkClosed);
+                setStatusMessage('MoonPay window closed. If you completed the purchase, VRE tokens will be delivered automatically within 5 minutes.');
+            }
+        }, 1000);
     };
 
     const handleCryptoPayment = async (crypto) => {
@@ -381,7 +438,38 @@ const App = () => {
 
     // --- Component JSX ---
     return (
-        <div className="bg-[#000000] text-white font-sans antialiased">
+        <>
+            <Head>
+                <title>VRE - Virtual Reality Economics | Decentralized Creator Economy</title>
+                <meta name="description" content="Join the VRE ecosystem - a decentralized platform empowering creators, investors, and developers on Solana blockchain. Liberation Day: July 18, 2028." />
+
+                {/* Open Graph Meta Tags */}
+                <meta property="og:title" content="VRE - Virtual Reality Economics | Decentralized Creator Economy" />
+                <meta property="og:description" content="Join the VRE ecosystem - a decentralized platform empowering creators, investors, and developers on Solana blockchain. Liberation Day: July 18, 2028." />
+                <meta property="og:image" content="https://vrecoin.com/favicon.png" />
+                <meta property="og:url" content="https://vrecoin.com" />
+                <meta property="og:type" content="website" />
+                <meta property="og:site_name" content="VRE - Virtual Reality Economics" />
+
+                {/* Twitter Card Meta Tags */}
+                <meta name="twitter:card" content="summary_large_image" />
+                <meta name="twitter:site" content="@VREconomics" />
+                <meta name="twitter:title" content="VRE - Virtual Reality Economics | Decentralized Creator Economy" />
+                <meta name="twitter:description" content="Join the VRE ecosystem - a decentralized platform empowering creators, investors, and developers on Solana blockchain. Liberation Day: July 18, 2028." />
+                <meta name="twitter:image" content="https://vrecoin.com/favicon.png" />
+
+                {/* Additional Meta Tags */}
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <meta name="theme-color" content="#9945FF" />
+                <link rel="canonical" href="https://vrecoin.com" />
+
+                {/* Existing favicon tags */}
+                <link rel="icon" href="/favicon.png" />
+                <link rel="apple-touch-icon" href="/favicon.png" />
+                <link rel="shortcut icon" href="/favicon.png" />
+            </Head>
+
+            <div className="bg-[#000000] text-white font-sans antialiased">
             {/* Background Gradient */}
             <div className="fixed top-0 left-0 w-full h-full -z-10">
                 <div className="absolute top-0 left-0 w-full h-[1200px] bg-gradient-to-br from-[#9945FF] via-transparent to-[#14F195] opacity-20 blur-[100px] transform -translate-x-1/4 -translate-y-1/4"></div>
@@ -403,7 +491,7 @@ const App = () => {
                         <a href="#tokenomics" className="text-gray-300 hover:text-white transition-colors">Tokenomics</a>
                         <a href="#roadmap" className="text-gray-300 hover:text-white transition-colors">Roadmap</a>
                         <a href="#ico" className="text-gray-300 hover:text-white transition-colors">Token Sale</a>
-                        <a href="/whitepaper" className="text-gray-300 hover:text-white transition-colors">Whitepaper</a>
+                        <a href="/whitepaper" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors">Whitepaper</a>
                     </nav>
                     <div className="hidden md:flex items-center space-x-4">
                         <button onClick={() => window.location.href = '/login'} className="bg-white/10 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20 transition-colors">
@@ -423,7 +511,7 @@ const App = () => {
                         <a onClick={() => setIsMobileMenuOpen(false)} href="#tokenomics" className="text-gray-300 hover:text-white transition-colors">Tokenomics</a>
                         <a onClick={() => setIsMobileMenuOpen(false)} href="#roadmap" className="text-gray-300 hover:text-white transition-colors">Roadmap</a>
                         <a onClick={() => setIsMobileMenuOpen(false)} href="#ico" className="text-gray-300 hover:text-white transition-colors">Token Sale</a>
-                        <a onClick={() => setIsMobileMenuOpen(false)} href="/whitepaper" className="text-gray-300 hover:text-white transition-colors">Whitepaper</a>
+                        <a onClick={() => setIsMobileMenuOpen(false)} href="/whitepaper" target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-white transition-colors">Whitepaper</a>
                         <button onClick={() => window.location.href = '/login'} className="bg-white/10 px-4 py-2 rounded-lg text-sm font-medium hover:bg-white/20 transition-colors">
                             Login
                         </button>
@@ -448,9 +536,9 @@ const App = () => {
                         <a href="#ico" className="w-full sm:w-auto bg-gradient-to-r from-[#9945FF] to-[#14F195] text-black font-bold px-8 py-4 rounded-lg hover:opacity-90 transition-opacity flex items-center justify-center">
                             Token Sale <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-arrow-right ml-2"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
                         </a>
-                        <button className="w-full sm:w-auto bg-white/10 border border-gray-700 text-white font-medium px-8 py-4 rounded-lg hover:bg-white/20 transition-colors">
-                            Read the Docs
-                        </button>
+                        <a href="/whitepaper" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto bg-white/10 border border-gray-700 text-white font-medium px-8 py-4 rounded-lg hover:bg-white/20 transition-colors inline-block text-center">
+                            White Paper
+                        </a>
                     </div>
                 </section>
 
@@ -519,7 +607,14 @@ const App = () => {
                             </div>
                             <div>
                                 <p className="text-gray-400 text-sm">Contract</p>
-                                <p className="text-2xl font-bold truncate">FJHQ...jZd9</p>
+                                <a
+                                    href="https://solscan.io/token/FJHQH4WTDukwyeFov2H7U9GZSiy4PPYLeuMGpbCujZd9"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-2xl font-bold truncate text-[#14F195] hover:text-[#12e3e6] transition-colors cursor-pointer"
+                                >
+                                    FJHQ...jZd9
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -738,6 +833,18 @@ const App = () => {
                                 <button onClick={() => handleCryptoPayment('SOL')} className="bg-white/10 border border-gray-700 text-white font-medium py-3 px-4 rounded-lg hover:bg-white/20 transition-colors w-full">
                                     Pay with SOL
                                 </button>
+
+                                {/* OR Divider */}
+                                <div className="flex items-center my-4">
+                                    <div className="flex-1 border-t border-gray-600"></div>
+                                    <span className="px-3 text-gray-400 text-sm font-medium">OR</span>
+                                    <div className="flex-1 border-t border-gray-600"></div>
+                                </div>
+
+                                {/* Second Payment Button */}
+                                <button onClick={handleMoonPayPayment} className="bg-white/10 border border-gray-700 text-white font-medium py-3 px-4 rounded-lg hover:bg-white/20 transition-colors w-full">
+                                    Pay with Card (MoonPay)
+                                </button>
                             </div>
                         </div>
 
@@ -745,7 +852,17 @@ const App = () => {
                         <div className="p-6 bg-gray-800 rounded-xl shadow-inner border border-gray-700">
                             <h2 className="text-2xl font-bold mb-4 text-center text-gray-200">Your Token Purchases</h2>
                             <div id="user-purchases-panel">
-                                {isLoadingTransactions ? (
+                                {!connected ? (
+                                    <div className="text-center text-gray-400">
+                                        <div className="mb-3">
+                                            <svg className="w-12 h-12 mx-auto mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                                            </svg>
+                                        </div>
+                                        <p className="text-lg font-medium text-gray-300 mb-2">Connect Your Wallet</p>
+                                        <p className="text-sm">Connect your wallet to view your token purchases and transaction history.</p>
+                                    </div>
+                                ) : isLoadingTransactions ? (
                                     <div className="text-center text-gray-400">
                                         <div className="animate-spin inline-block w-6 h-6 border-[3px] border-current border-t-transparent text-purple-400 rounded-full mb-2" role="status" aria-label="loading"></div>
                                         <p>Loading your purchases...</p>
@@ -914,17 +1031,32 @@ const App = () => {
                     <p className="text-2xl font-bold tracking-tighter bg-gradient-to-r from-[#9945FF] to-[#14F195] text-transparent bg-clip-text mb-4">
                         VRE
                     </p>
-                    <div className="flex justify-center space-x-6 mb-8">
-                        <a href="https://x.com/VREconomics" className="hover:text-white" target="_blank">X</a>
-                        <a href="#" className="hover:text-white" target="_blank">Discord</a>
-                        <a href="#" className="hover:text-white" target="_blank">Telegram</a>
-                        <a href="#" className="hover:text-white" target="_blank">GitHub</a>
+                    <div className="flex justify-center mb-8">
+                        <a href="https://x.com/VREconomics" className="hover:text-white" target="_blank">x.com/VREconomics</a>
+                    </div>
+                    <div className="space-y-4 mb-4">
+                        <div className="flex flex-wrap justify-center gap-4">
+                            <a href="/" className="text-[#14F195] hover:text-[#12e3e6]">Home</a>
+                            <span className="text-gray-600">•</span>
+                            <a href="/whitepaper" className="text-[#14F195] hover:text-[#12e3e6]">Whitepaper</a>
+                            <span className="text-gray-600">•</span>
+                            <a href="/#roadmap" className="text-[#14F195] hover:text-[#12e3e6]">Roadmap</a>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-4 text-sm">
+                            <a href="/privacy-policy" className="text-gray-400 hover:text-[#14F195]">Privacy Policy</a>
+                            <span className="text-gray-600">•</span>
+                            <a href="/terms-of-service" className="text-gray-400 hover:text-[#14F195]">Terms of Service</a>
+                        </div>
+                        <p className="text-xs text-gray-500 text-center">
+                            Built on Solana • Decentralized • Community Governed
+                        </p>
                     </div>
                     <p>&copy; 2025 Virtual Reality Economics. All rights reserved.</p>
                     <p className="text-sm mt-2">This is not financial advice. Always do your own research.</p>
                 </div>
             </footer>
-        </div>
+            </div>
+        </>
     );
 };
 

@@ -1,0 +1,15 @@
+{
+  "name": "vre-webhook-server",
+  "version": "1.0.0",
+  "description": "VRE MoonPay Webhook Server",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.14",
+    "@solana/web3.js": "^1.98.4",
+    "express": "^5.1.0"
+  }
+}
