@@ -4,8 +4,9 @@
   "description": "",
   "main": "initialize.js",
   "scripts": {
-    "start": "node webhook-server.js",
-    "dev": "node webhook-server.js",
+    "start": "node moonpay-webhook-handler.js",
+    "dev": "node moonpay-webhook-handler.js",
+    "monitor": "node payment-monitor.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -16,6 +17,10 @@
     "@coral-xyz/anchor": "^0.31.1",
     "@metaplex-foundation/js": "^0.20.1",
     "@metaplex-foundation/mpl-token-metadata": "^3.4.0",
+    "@metaplex-foundation/mpl-toolbox": "^0.10.0",
+    "@metaplex-foundation/umi": "^1.4.1",
+    "@metaplex-foundation/umi-bundle-defaults": "^1.4.1",
+    "@metaplex-foundation/umi-uploader-irys": "^1.4.1",
     "@solana/spl-token": "^0.4.14",
     "@solana/web3.js": "^1.98.4",
     "bs58": "^5.0.0",
